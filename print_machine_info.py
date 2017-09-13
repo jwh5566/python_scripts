@@ -1,5 +1,6 @@
+#!/usr/bin/env python
+# This program is optimized for Python 2.7.
 import socket
-
 
 def print_machine_info():
     host_name = socket.gethostname()

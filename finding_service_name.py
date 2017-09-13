@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# This program is optimized for Python 2.7.
 import socket
 
 def find_service_name():

@@ -1,5 +1,6 @@
+#!/usr/bin/env python
+# This program is optimized for Python 2.7.
 import socket
-
 
 def get_remote_machine_info():
     remote_host = 'www.python.org'
