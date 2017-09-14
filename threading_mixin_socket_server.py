@@ -22,12 +22,14 @@ def client(ip, port, message):
     finally:
         sock.close()
 
+
 class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         data = self.request.recv(BUF_SIZE)
         current_thread = threading.current_thread()
         response = "%s: %s" %(current_thread.name, data)
         self.request.sendall(response)
+
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn,
                         SocketServer.TCPServer):
