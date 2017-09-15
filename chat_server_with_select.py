@@ -19,35 +19,38 @@ CHAT_SERVER_NAME = 'server'
 
 # 工具方法
 def send(channel, *args):
-    buffer = cPickle.dump(args)  # 序列化 用于传输给客户端
-    value = socket.htonl(len(buffer))  # 转换成网络字节序
+    buffer = cPickle.dumps(args)  # 序列化 用于传输给客户端
+    value = socket.htonl(len(buffer))  # 转换成网络字节序，用于网络传输
     size = struct.pack("L", value)  # 按照给定的格式(fmt)，把数据封装成字符串(实际上是类似于c结构体的字节流)
-    channel.send(size, buffer)  # ？？ 这里的send 为什么有size 参数？？
+    channel.send(size)
+    channel.send(buffer)
 
 
 def receive(channel):
     size = struct.calcsize("L")  # 计算无符号长整型占用多少字节内存
     size = channel.recv(size)
     try:
-        size = socket.ntohl(struct.unpack("L", size)[0])
+        size = socket.ntohl(struct.unpack("L", size)[0])    # 解包，并且转换成主机字节序，
+                                                            # unpack要求size的长度必须要等于calcsize的大小，所以上面recv(fmt的大小)
+                                                            # unpack的返回值是元祖，即使只有一个值
     except struct.error, e:
         return ''
     buf = ""
     while len(buf) < size:
         buf = channel.recv(size - len(buf))
-    return cPickle.loads(buf)[0]
+    return cPickle.loads(buf)[0]    # 这里只返回client发送的第一个对象
 
 
 class ChatServer(object):
     def __init__(self, port, backlog=5):
-        self.clients = 0
-        self.clientmap = {}
-        self.outputs = []
+        self.clients = 0  # 客户端数量
+        self.clientmap = {}   # 客户端的映射关系
+        self.outputs = []     # fork 的sockets
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.bind((SERVER_HOST, port))
         print "服务器监听在端口: %s" %port
-        self.server.listen(backlog)
+        self.server.listen(backlog)   # 最大连接队列数
 
         # 捕获键盘中断信号
         signal.signal(signal.SIGINT, self.sighandler)  # 类型 和 动作
@@ -61,7 +64,7 @@ class ChatServer(object):
             output.close()
         self.server.close()
 
-    def get_client_name(self, client):
+    def get_client_name(self, client):   # 这里的client表示与client发送数据的socket对象
         info = self.clientmap[client]
         host, name = info[0][0], info[1]
         return '@'.join((name, host))
@@ -77,12 +80,12 @@ class ChatServer(object):
                 break
             for sock in readable:
                 if sock == self.server:
-                    # 处理服务断socket
+                    # 服务端socket
                     client, address = self.server.accept()
-                    print "聊天室: 获取连接 %d 来自 %s" %(client.fileno, address)  # fileno socket的文件描述符
-                    # 获取登录名
+                    print "聊天室: 获取连接 %d 来自 %s" %(client.fileno(), address)  # fileno socket的文件描述符
+                    # 获取客户端发送的名字
                     cname = receive(client).split('NAME: ')[1]
-                    # 计算客户端名并且返回给客户端
+                    # 计算客户端数并且返回给客户端
                     self.clients += 1
                     send(client, 'CLIENT: ' + str(address[0]))
                     inputs.append(client)
@@ -97,7 +100,7 @@ class ChatServer(object):
                     junk = sys.stdin.readline()
                     running = False
                 else:
-                    # 处理其他socket
+                    # 处理其他sockets
                     try:
                         data = receive(sock)
                         if data:
@@ -127,17 +130,17 @@ class ChatClient(object):
         self.connected = False
         self.host = host
         self.port = port
-        self.prompt = '[' + '@'.join((name, socket.gethostname().split('.')[0])) + '] '
+        self.prompt = '[' + '@'.join((name, socket.gethostname().split('.')[0])) + ']> '
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.connect((host, self.port))
             print "连接到聊天室@ port %d" % self.port
             self.connected = True
-            # 发送我的名字
+            # 发送自己的名字
             send(self.sock, 'NAME: ' + self.name)
             data = receive(self.sock)
             addr = data.split('CLIENT: ')[1]
-            self.prompt = '[' + '@'.join((self.name), addr) + ']> '
+            self.prompt = '[' + '@'.join((self.name, addr)) + ']> '
         except socket.error, e:
             print "连接聊天室失败 @ port %d" %self.port
             sys.exit(1)
@@ -156,7 +159,7 @@ class ChatClient(object):
                 for sock in readable:
                     if sock == 0:
                         data = sys.stdin.readline().strip()
-                        if data:send(self.sock, data)
+                        if data: send(self.sock, data)
                     elif sock == self.sock:
                         data = receive(self.sock)
                         if not data:
