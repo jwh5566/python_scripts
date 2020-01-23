@@ -2,10 +2,10 @@
 #!/usr/bin/env python
 # This program is optimized for Python 2.7
 
-import os
 import argparse
-import socket
+import os
 import select
+import socket
 import struct
 import time
 
@@ -97,7 +97,7 @@ class Pinger(object):
         except socket.error, (errno, msg):
             if errno == 1:
                 msg += "ICMP messages can only be sent from root user processes"
-                raise socket.error(msg)
+            raise socket.error(msg)
         except Exception, e:
             print "Exception: %s" %e
         my_ID = os.getpid() & 0xFFFF
@@ -107,7 +107,6 @@ class Pinger(object):
         return delay
 
     def ping(self):
-        for i in xrange(self.count):
             print "ping to %s..."% self.target_host
             try:
                 delay = self.ping_once()
